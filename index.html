@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Trader">
+<meta name="theme-color" content="#07090d">
+<title>Trader Assistant</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600;700&display=swap">
+<style>
+:root { --bg:#07090d; --surface:#121820; --fg:#e7edf4; --muted:#8b97a6; --accent:#2ec5d6; --line:#243041; --up:#3dce9a; --down:#f07178; --warn:#e6b450; color-scheme:dark; }
+[data-theme="amber"] { --bg:#100e0a; --surface:#1c1812; --fg:#f3ead8; --muted:#a89880; --accent:#e6b450; --line:#3a3124; --up:#7dce6a; --down:#e07a5f; --warn:#f2cc8f; }
+[data-theme="paper"] { --bg:#f3efe6; --surface:#fffdf8; --fg:#1c1915; --muted:#6d655b; --accent:#0f6e6e; --line:#e2d8c8; --up:#1b7f4e; --down:#b42318; --warn:#9a6700; color-scheme:light; }
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html, body { height:100%; margin:0; }
+body { font-family:"IBM Plex Sans",sans-serif; background:var(--bg); color:var(--fg); display:flex; flex-direction:column; overflow:hidden; }
+button, input, select { font:inherit; color:inherit; }
+button { cursor:pointer; }
+header { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid var(--line); background:var(--bg); }
+.brand { font-family:"IBM Plex Mono",monospace; color:var(--accent); font-weight:600; font-size:14px; }
+.muted { color:var(--muted); font-size:12px; }
+.actions { display:flex; gap:8px; }
+.ghost, .btn { height:44px; border-radius:999px; padding:0 12px; }
+.ghost { border:1px solid var(--line); background:var(--surface); }
+.btn { border:0; background:var(--accent); color:var(--bg); font-weight:700; }
+main { flex:1; min-height:0; overflow:auto; padding:12px 12px 8px; }
+.panel { background:var(--surface); border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+.markets { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+.card { background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:12px; min-height:108px; }
+.card b { font-family:"IBM Plex Mono",monospace; font-size:14px; }
+.up { color:var(--up); } .down { color:var(--down); } .warn { color:var(--warn); }
+.row { display:flex; gap:8px; flex-wrap:wrap; padding:8px; border-bottom:1px solid var(--line); align-items:center; }
+input, select { height:44px; border:1px solid var(--line); background:var(--bg); border-radius:10px; padding:0 10px; min-width:0; }
+.grow { flex:1; }
+#chart { height:calc(100dvh - 210px); min-height:280px; border:0; width:100%; background:var(--bg); display:block; }
+.tabs { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); }
+.tabs button, .item, .tile { border:0; background:transparent; }
+.tabs button { height:44px; color:var(--muted); font-size:12px; font-weight:600; }
+.tabs button.on { color:var(--accent); }
+.item { width:100%; text-align:left; border-bottom:1px solid var(--line); padding:12px; display:flex; justify-content:space-between; gap:8px; align-items:center; }
+.item span { display:block; }
+.star { width:44px; height:44px; border:0; background:transparent; color:var(--muted); }
+.star.on { color:var(--warn); }
+.heat { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; padding:8px; }
+.tile { border-radius:12px; padding:14px; text-align:left; background:var(--bg); }
+nav { display:grid; grid-template-columns:repeat(4,1fr); border-top:1px solid var(--line); background:var(--bg); padding-bottom:env(safe-area-inset-bottom); }
+nav button { height:62px; border:0; background:transparent; color:var(--muted); font-size:12px; }
+nav button.on { color:var(--accent); font-weight:700; }
+.view { display:none; }
+.view.on { display:block; }
+.help { margin:0 0 12px; padding:12px; border:1px solid var(--line); border-radius:14px; background:var(--surface); }
+@media (min-width:960px) {
+  .markets { grid-template-columns:repeat(4,minmax(0,1fr)); }
+  .heat { grid-template-columns:repeat(6,minmax(0,1fr)); }
+  nav, .help { display:none; }
+  .view { display:block !important; }
+  main { overflow:auto; }
+  .desk { display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:12px; margin-top:12px; }
+  #chart { height:640px; }
+  #list { max-height:640px; overflow:auto; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <div class="brand">TRADER / ASSISTANT</div>
+    <div class="muted" id="sub">Телефон: нижние вкладки. Файл открывается сам.</div>
+  </div>
+  <div class="actions">
+    <button class="ghost" id="bell" type="button">Сигнал</button>
+    <button class="ghost" id="theme" type="button">Тема</button>
+  </div>
+</header>
+<main>
+  <p class="help" id="help">На iPhone: Поделиться → На экран «Домой». На Android: меню браузера → Установить или Добавить на главный экран. Нужен Safari или Chrome, не встроенный просмотр.</p>
+  <section class="view" id="v-markets"><div class="markets" id="markets"></div></section>
+  <section class="desk">
+    <div class="view on panel" id="v-chart">
+      <div class="row">
+        <input id="symbol" class="grow" value="RUS:IRUS" aria-label="Тикер">
+        <select id="interval" aria-label="Таймфрейм">
+          <option value="5">5м</option>
+          <option value="15">15м</option>
+          <option value="60">1ч</option>
+          <option value="D" selected>1д</option>
+        </select>
+        <button class="btn" id="load" type="button">График</button>
+        <button class="ghost" id="full" type="button">Экран</button>
+        <a class="ghost" id="tv" style="display:inline-flex;align-items:center;text-decoration:none" target="_blank" rel="noreferrer">TV</a>
+      </div>
+      <iframe id="chart" title="График" allow="fullscreen"></iframe>
+    </div>
+    <div class="view panel" id="v-list">
+      <div class="tabs" id="books"></div>
+      <div class="row"><input id="q" class="grow" placeholder="Тикер или название" aria-label="Поиск"></div>
+      <div id="list"></div>
+    </div>
+  </section>
+  <section class="view panel" id="v-heat" style="margin-top:12px">
+    <div class="tabs" id="hbooks"></div>
+    <div class="heat" id="heat"></div>
+  </section>
+</main>
+<nav>
+  <button type="button" id="n-markets">Биржи</button>
+  <button type="button" id="n-chart" class="on">График</button>
+  <button type="button" id="n-list">Список</button>
+  <button type="button" id="n-heat">Карта</button>
+</nav>
+<script>
+const THEMES = ["terminal", "amber", "paper"];
+const BOOK_META = [
+  ["fav", "Избранные"],
+  ["ru", "Акции РФ"],
+  ["comm", "Товарка"],
+  ["crypto", "Крипта"]
+];
+const MARKETS = [
+  { id:"nyse", name:"NYSE", city:"Нью-Йорк", tz:"America/New_York", open:[9,30], close:[16,0], days:[1,2,3,4,5] },
+  { id:"lse", name:"LSE", city:"Лондон", tz:"Europe/London", open:[8,0], close:[16,30], days:[1,2,3,4,5] },
+  { id:"xetra", name:"Xetra", city:"Франкфурт", tz:"Europe/Berlin", open:[9,0], close:[17,30], days:[1,2,3,4,5] },
+  { id:"sse", name:"SSE", city:"Шанхай", tz:"Asia/Shanghai", sessions:[[9,30,11,30],[13,0,15,0]], days:[1,2,3,4,5] },
+  { id:"tse", name:"TSE", city:"Токио", tz:"Asia/Tokyo", sessions:[[9,0,11,30],[12,30,15,0]], days:[1,2,3,4,5] },
+  { id:"moex", name:"MOEX", city:"Москва", tz:"Europe/Moscow", open:[10,0], close:[18,50], days:[1,2,3,4,5] },
+  { id:"crypto", name:"CRYPTO", city:"Круглосуточно", tz:"UTC", always:true }
+];
+const ALL = [
+  ["RUS:SGZH","Сегежа","+1.01%"],["RUS:IRUS2","IMOEX доп.","+0.20%"],["RUS:NG1!","Природный газ","+0.56%"],
+  ["RUS:RBH2026","RGBI фьючерс","-0.41%"],["RUS:T","Т-Технологии","-0.32%"],["RUS:SPBE","СПБ Биржа","+2.67%"],
+  ["RUS:BR1!","Brent","-0.12%"],["RUS:NVTK","Новатэк","+0.14%"],["COMEX:SI1!","Серебро","+2.76%"],
+  ["RUS:TGKN","ТГК-14","+0.53%"],["BINANCE:BTCUSDT","Bitcoin","+1.02%"],["RUS:IRUS","Индекс МосБиржи","+0.20%"],
+  ["RUS:LKOH","Лукойл","+0.33%"],["RUS:SBER","Сбербанк"],["RUS:GAZP","Газпром"],["RUS:ROSN","Роснефть"],
+  ["RUS:YDEX","Яндекс"],["RUS:TATN","Татнефть"],["RUS:GMKN","Норникель"],["RUS:PLZL","Полюс"],
+  ["RUS:ALRS","Алроса"],["RUS:CHMF","Северсталь"],["RUS:NLMK","НЛМК"],["RUS:MAGN","ММК"],
+  ["RUS:MTSS","МТС"],["RUS:MOEX","Мосбиржа"],["RUS:VTBR","ВТБ"],["RUS:SNGS","Сургутнефтегаз"],
+  ["RUS:SNGSP","Сургутнефтегаз преф"],["RUS:IRAO","Интер РАО"],["RUS:FEES","Россети"],
+  ["RUS:HYDR","РусГидро"],["RUS:PHOR","ФосАгро"],["RUS:AFLT","Аэрофлот"],["RUS:MGNT","Магнит"],
+  ["RUS:FIVE","X5"],["RUS:OZON","Ozon"],["RUS:PIKK","ПИК"],["RUS:RTKM","Ростелеком"],
+  ["RUS:AFKS","АФК Система"],["RUS:RTSI","Индекс РТС"],["NYMEX:CL1!","WTI"],["COMEX:GC1!","Золото"],
+  ["COMEX:HG1!","Медь"],["COMEX:PL1!","Платина"],["NYMEX:RB1!","Бензин"],
+  ["BINANCE:ETHUSDT","Ethereum"],["BINANCE:SOLUSDT","Solana"],["BINANCE:BNBUSDT","BNB"],
+  ["BINANCE:XRPUSDT","XRP"],["BINANCE:TONUSDT","Toncoin"],["BINANCE:DOGEUSDT","Dogecoin"],["BINANCE:ADAUSDT","Cardano"]
+];
+const BOOKS = {
+  fav: ["RUS:SGZH","RUS:IRUS2","RUS:NG1!","RUS:RBH2026","RUS:T","RUS:SPBE","RUS:BR1!","RUS:NVTK","COMEX:SI1!","RUS:TGKN","BINANCE:BTCUSDT","RUS:IRUS","RUS:LKOH"],
+  ru: ["RUS:SBER","RUS:GAZP","RUS:LKOH","RUS:NVTK","RUS:ROSN","RUS:YDEX","RUS:TATN","RUS:GMKN","RUS:PLZL","RUS:ALRS","RUS:CHMF","RUS:NLMK","RUS:MAGN","RUS:MTSS","RUS:MOEX","RUS:VTBR","RUS:SNGS","RUS:SNGSP","RUS:IRAO","RUS:FEES","RUS:HYDR","RUS:PHOR","RUS:AFLT","RUS:MGNT","RUS:FIVE","RUS:OZON","RUS:T","RUS:PIKK","RUS:RTKM","RUS:AFKS","RUS:SGZH","RUS:SPBE","RUS:IRUS","RUS:RTSI"],
+  comm: ["RUS:BR1!","NYMEX:CL1!","RUS:NG1!","COMEX:GC1!","COMEX:SI1!","COMEX:HG1!","COMEX:PL1!","NYMEX:RB1!"],
+  crypto: ["BINANCE:BTCUSDT","BINANCE:ETHUSDT","BINANCE:SOLUSDT","BINANCE:BNBUSDT","BINANCE:XRPUSDT","BINANCE:TONUSDT","BINANCE:DOGEUSDT","BINANCE:ADAUSDT"]
+};
+const bySymbol = new Map(ALL.map(([symbol, name, change]) => [symbol, { symbol, name, change: change || "" }]));
+const DAY = { Sun:0, Mon:1, Tue:2, Wed:3, Thu:4, Fri:5, Sat:6 };
+let book = "fav";
+let heat = "ru";
+let favs = loadFavs();
+let themeIndex = Math.max(0, THEMES.indexOf(localStorage.getItem("ta-theme") || "terminal"));
+let notify = localStorage.getItem("ta-notify") === "1";
+const seen = new Set();
+
+function loadFavs() {
+  try {
+    const raw = JSON.parse(localStorage.getItem("ta-favs") || "null");
+    if (Array.isArray(raw) && raw.length) return raw;
+  } catch (e) {}
+  return BOOKS.fav.slice();
+}
+function ticker(symbol) { return symbol.split(":")[1] || symbol; }
+function item(symbol) { return bySymbol.get(symbol) || { symbol, name: ticker(symbol), change: "" }; }
+function zoned(tz, date) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday:"short", hour:"2-digit", minute:"2-digit", second:"2-digit", hourCycle:"h23" }).formatToParts(date).map((p) => [p.type, p.value]));
+  const hour = Number(parts.hour === "24" ? "0" : parts.hour);
+  return { day: DAY[parts.weekday] || 0, minutes: hour * 60 + Number(parts.minute), clock: String(hour).padStart(2,"0") + ":" + parts.minute + ":" + parts.second };
+}
+function mins(pair) { return pair[0] * 60 + pair[1]; }
+function waitText(total) {
+  if (total < 1) return "меньше минуты";
+  const h = Math.floor(total / 60), m = total % 60;
+  if (h <= 0) return m + " мин";
+  if (m === 0) return h + " ч";
+  return h + " ч " + m + " мин";
+}
+function sessions(market) {
+  if (market.sessions) return market.sessions.map((s) => ({ open: [s[0], s[1]], close: [s[2], s[3]] }));
+  return [{ open: market.open, close: market.close }];
+}
+function snap(market, date) {
+  const zone = zoned(market.tz, date);
+  if (market.always) return { open:true, clock:zone.clock, text:"торги 24/7", tone:"up" };
+  const list = sessions(market);
+  const tradable = market.days.indexOf(zone.day) >= 0;
+  const current = tradable && list.find((s) => zone.minutes >= mins(s.open) && zone.minutes < mins(s.close));
+  if (current) {
+    const wait = mins(current.close) - zone.minutes;
+    return { open:true, clock:zone.clock, text:"закроется через " + waitText(wait), tone: wait < 60 ? "warn" : "up", edge:"close", wait };
+  }
+  for (let add = 0; add < 8; add++) {
+    const day = (zone.day + add) % 7;
+    if (market.days.indexOf(day) < 0) continue;
+    for (const s of list) {
+      const openMin = mins(s.open);
+      if (add === 0 && openMin <= zone.minutes) continue;
+      const wait = add === 0 ? openMin - zone.minutes : 1440 - zone.minutes + (add - 1) * 1440 + openMin;
+      return { open:false, clock:zone.clock, text:"откроется через " + waitText(wait), tone: wait < 60 ? "warn" : "down", edge:"open", wait };
+    }
+  }
+  return { open:false, clock:zone.clock, text:"выходной", tone:"down" };
+}
+function paintMarkets() {
+  const now = new Date();
+  document.getElementById("markets").innerHTML = MARKETS.map((market) => {
+    const s = snap(market, now);
+    if (notify && s.edge && s.wait <= 15 && (s.wait === 15 || s.wait <= 1) && Notification.permission === "granted") {
+      const key = market.id + s.edge + Math.floor(now.getTime() / 600000);
+      if (!seen.has(key)) {
+        seen.add(key);
+        new Notification(market.name, { body: s.text });
+      }
+    }
+    return '<article class="card"><div class="muted">' + market.city + '</div><b>' + market.name + '</b><div class="' + s.tone + '" style="margin-top:8px;font-family:IBM Plex Mono,monospace;font-size:12px">' + (s.open ? "ОТКРЫТО" : "ЗАКРЫТО") + '</div><div class="muted">' + s.clock + '</div><div class="' + s.tone + '" style="margin-top:4px;font-size:12px">' + s.text + '</div></article>';
+  }).join("");
+}
+function rows(id) { return (id === "fav" ? favs : BOOKS[id]).map(item); }
+function paintBooks(root, current, pick) {
+  document.getElementById(root).innerHTML = BOOK_META.map(([id, label]) => '<button type="button" data-book="' + id + '" class="' + (id === current ? "on" : "") + '">' + label + '</button>').join("");
+  document.getElementById(root).onclick = (event) => {
+    const next = event.target.closest("button");
+    if (!next) return;
+    pick(next.dataset.book);
+  };
+}
+function paintList() {
+  paintBooks("books", book, (id) => { book = id; paintList(); });
+  const needle = document.getElementById("q").value.trim().toLowerCase();
+  const list = rows(book).filter((row) => !needle || row.symbol.toLowerCase().includes(needle) || row.name.toLowerCase().includes(needle) || ticker(row.symbol).toLowerCase().includes(needle));
+  document.getElementById("list").innerHTML = list.length ? list.map((row) => {
+    const on = favs.indexOf(row.symbol) >= 0;
+    const tone = row.change.startsWith("-") ? "down" : "up";
+    return '<div style="display:flex;align-items:center"><button class="item" type="button" data-symbol="' + row.symbol + '"><span><b style="font-family:IBM Plex Mono,monospace">' + ticker(row.symbol) + '</b><span class="muted">' + row.name + '</span></span>' + (row.change ? '<span class="' + tone + '" style="font-family:IBM Plex Mono,monospace">' + row.change + '</span>' : '') + '</button><button class="star ' + (on ? "on" : "") + '" type="button" data-fav="' + row.symbol + '" aria-label="В избранное">★</button></div>';
+  }).join("") : '<p class="muted" style="text-align:center;padding:24px">Ничего не найдено</p>';
+}
+function paintHeat() {
+  paintBooks("hbooks", heat, (id) => { heat = id; paintHeat(); });
+  document.getElementById("heat").innerHTML = rows(heat).map((row) => {
+    const neg = row.change.startsWith("-");
+    const bg = !row.change ? "var(--bg)" : neg ? "color-mix(in srgb, var(--down) 22%, var(--bg))" : "color-mix(in srgb, var(--up) 22%, var(--bg))";
+    return '<button class="tile" type="button" data-symbol="' + row.symbol + '" style="background:' + bg + '"><b style="font-family:IBM Plex Mono,monospace">' + ticker(row.symbol) + '</b><span class="muted" style="display:block;margin-top:4px">' + row.name + '</span><span style="display:block;margin-top:8px;font-family:IBM Plex Mono,monospace">' + (row.change || "—") + '</span></button>';
+  }).join("");
+}
+function chartUrl(symbol) {
+  const mode = document.documentElement.dataset.theme === "paper" ? "light" : "dark";
+  const interval = document.getElementById("interval").value;
+  return "https://s.tradingview.com/widgetembed/?symbol=" + encodeURIComponent(symbol) + "&interval=" + encodeURIComponent(interval) + "&theme=" + mode + "&style=1&locale=ru&timezone=Europe%2FMoscow&hidesidetoolbar=1&symboledit=1&saveimage=0&hideideas=1&withdateranges=1";
+}
+function loadChart(symbol) {
+  const next = (symbol || document.getElementById("symbol").value || "RUS:IRUS").trim();
+  document.getElementById("symbol").value = next;
+  document.getElementById("chart").src = chartUrl(next);
+  document.getElementById("tv").href = "https://www.tradingview.com/chart/?symbol=" + encodeURIComponent(next);
+}
+function setView(name) {
+  ["markets", "chart", "list", "heat"].forEach((id) => {
+    document.getElementById("v-" + id).classList.toggle("on", id === name);
+    document.getElementById("n-" + id).classList.toggle("on", id === name);
+  });
+}
+function applyTheme() {
+  const name = THEMES[themeIndex] || "terminal";
+  if (name === "terminal") delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = name;
+  localStorage.setItem("ta-theme", name);
+  loadChart();
+}
+document.getElementById("books").addEventListener("click", () => {});
+document.getElementById("list").addEventListener("click", (event) => {
+  const fav = event.target.closest("[data-fav]");
+  if (fav) {
+    const symbol = fav.dataset.fav;
+    favs = favs.indexOf(symbol) >= 0 ? favs.filter((id) => id !== symbol) : [symbol].concat(favs);
+    localStorage.setItem("ta-favs", JSON.stringify(favs));
+    paintList();
+    paintHeat();
+    return;
+  }
+  const row = event.target.closest("[data-symbol]");
+  if (!row) return;
+  loadChart(row.dataset.symbol);
+  setView("chart");
+});
+document.getElementById("heat").addEventListener("click", (event) => {
+  const row = event.target.closest("[data-symbol]");
+  if (!row) return;
+  loadChart(row.dataset.symbol);
+  setView("chart");
+});
+document.getElementById("q").addEventListener("input", paintList);
+document.getElementById("load").addEventListener("click", () => loadChart());
+document.getElementById("symbol").addEventListener("keydown", (event) => { if (event.key === "Enter") loadChart(); });
+document.getElementById("interval").addEventListener("change", () => loadChart());
+document.getElementById("full").addEventListener("click", () => {
+  const node = document.getElementById("v-chart");
+  if (document.fullscreenElement) document.exitFullscreen();
+  else node.requestFullscreen();
+});
+document.getElementById("theme").addEventListener("click", () => { themeIndex = (themeIndex + 1) % THEMES.length; applyTheme(); });
+document.getElementById("bell").addEventListener("click", async () => {
+  if (notify) { notify = false; localStorage.setItem("ta-notify", "0"); document.getElementById("bell").textContent = "Сигнал"; return; }
+  const perm = Notification.permission === "granted" ? "granted" : await Notification.requestPermission();
+  notify = perm === "granted";
+  localStorage.setItem("ta-notify", notify ? "1" : "0");
+  document.getElementById("bell").textContent = notify ? "Сигнал вкл" : "Сигнал";
+});
+["markets", "chart", "list", "heat"].forEach((id) => document.getElementById("n-" + id).addEventListener("click", () => setView(id)));
+applyTheme();
+paintMarkets();
+paintList();
+paintHeat();
+setInterval(paintMarkets, 1000);
+if (window.matchMedia("(display-mode: standalone)").matches) document.getElementById("help").style.display = "none";
+</script>
+</body>
+</html>
